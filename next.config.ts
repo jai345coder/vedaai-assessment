@@ -8,3 +8,4 @@ const nextConfig = {
   },
 };
 export default nextConfig;
+//https://github.com/jai345coder/vedaai-assessment.git
