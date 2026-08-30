@@ -57,7 +57,7 @@ async function compressImage(file:File):Promise<string>{
  ctx.drawImage(img,0,0,width,height);
 
  // JPEG at 80%
- const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+ const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.5);
  return jpegDataUrl;
 }
 
@@ -100,9 +100,9 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
 
     return images;
   } else {
-    // Plain image upload (jpg/png) — compress before returning, since
-    // phone camera photos can be huge and blow past Vercel's payload limit.
+    console.log("Original file size (MB):", file.size / (1024 * 1024));
     const dataUrl = await compressImage(file);
+    console.log("Compressed size (MB):", dataUrl.length / (1024 * 1024));
     return [{ pageIndex: 1, imgUrl: dataUrl }];
   }
 }
