@@ -63,7 +63,7 @@ const payloadSizeMB = (answerPayload.length / (1024 * 1024)).toFixed(2);
 setErrorMessage(`DEBUG: Answer payload size = ${payloadSizeMB} MB (images: ${answerPaperImg.length}, first image length: ${answerPaperImg[0]?.imgUrl?.length || 0} chars)`);
 
 // Pause here so you can read it before the real request potentially fails
-await new Promise((r) => setTimeout(r, 100));
+await new Promise((r) => setTimeout(r, 3000));
 
 const aRes = await fetch("/api/extract-answers", {
   method: "POST",
