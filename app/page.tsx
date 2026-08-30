@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import UploadPanel, { PageImage, FileDetails } from "./components/UploadPanel";
-import AnswerSheetViewer from "./components/AnswerSheetViewer";
+import {AnswerSheetViewer}  from "./components/AnswerSheetViewer";
 import Sidebar from "./components/Sidebar";
 import { Question, AnswerSegment } from "./lib/types";
 
@@ -54,16 +54,31 @@ export default function Home() {
       const qData = await qRes.json();
       const rawQuestions = qData.questions?.questions || qData.questions || [];
       setExtractQuestions(rawQuestions);
+// Step 2: Extract answers, map bounding boxes, and grade correctness
 
+// TEMP DEBUG: show the actual payload size in the visible error banner,
+// since DevTools access has been unreliable. Remove after diagnosing.
+const answerPayload = JSON.stringify({ images: answerPaperImg, questions: rawQuestions });
+const payloadSizeMB = (answerPayload.length / (1024 * 1024)).toFixed(2);
+setErrorMessage(`DEBUG: Answer payload size = ${payloadSizeMB} MB (images: ${answerPaperImg.length}, first image length: ${answerPaperImg[0]?.imgUrl?.length || 0} chars)`);
+
+// Pause here so you can read it before the real request potentially fails
+await new Promise((r) => setTimeout(r, 100));
+
+const aRes = await fetch("/api/extract-answers", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: answerPayload,
+});
       // Step 2: Extract answers, map bounding boxes, and grade correctness
-      const aRes = await fetch("/api/extract-answers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          images: answerPaperImg,
-          questions: rawQuestions,
-        }),
-      });
+      // const aRes = await fetch("/api/extract-answers", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     images: answerPaperImg,
+      //     questions: rawQuestions,
+      //   }),
+      // });
 
       if (!aRes.ok) {
         throw new Error("Failed to map and grade answers from answer sheets.");
