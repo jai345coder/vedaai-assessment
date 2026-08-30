@@ -48,7 +48,7 @@ async function compressImage(file: File): Promise<string> {
       throw new Error(`Invalid image dimensions (${naturalWidth}x${naturalHeight}) for file: ${file.name}`);
     }
 
-    const MAX_DIMENSION = 1600;
+    const MAX_DIMENSION = 1000;
     let width = naturalWidth;
     let height = naturalHeight;
 
@@ -73,7 +73,7 @@ async function compressImage(file: File): Promise<string> {
     ctx.drawImage(img, 0, 0, width, height);
 
     // Export as JPEG at 80% quality (0.8)
-    const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.4);
 
     const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2);
     // Base64 payload size in MB approx = (char count * 3/4) / (1024 * 1024)
@@ -147,9 +147,10 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
     console.log(`[PDF Processing] Rendered ${images.length} pages as compressed JPEGs.`);
     return images;
   } else {
-    // Process image file through canvas-based downsampling & JPEG compression
     const dataUrl = await compressImage(file);
-    return [{ pageIndex: 1, imgUrl: dataUrl }];
+  const sizeMB = (dataUrl.length * 0.75) / (1024 * 1024); // base64 is ~33% larger than binary, so *0.75 estimates real size
+  document.title = `Compressed: ${sizeMB.toFixed(2)} MB`; // shows in browser tab title, easy to see on phone
+  return [{ pageIndex: 1, imgUrl: dataUrl }];
   }
 }
 
