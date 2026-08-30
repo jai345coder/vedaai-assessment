@@ -366,7 +366,7 @@ export default function Home() {
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  <span>Start Mapping</span>
+                  <span>TESTING123</span>
                   <span>→</span>
                 </button>
 
