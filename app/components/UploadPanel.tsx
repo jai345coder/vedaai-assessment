@@ -14,54 +14,83 @@ export type FileDetails = {
 };
 
 /**
- * Takes a @raw_image File and returns a @compressed_base64 dataUrl.
- * Caps the longest side at 1600 px and exports as @JPEG at 80% quality —
- * @raw_phone_camera photo (which can be 4000px+ and several MB)
+ * Takes a raw image File and returns a compressed base64 JPEG dataUrl.
+ * Caps the longest side at 1600 px and exports as JPEG at 80% quality.
+ * Handles high-resolution mobile camera uploads (4000px+, 8MB+) efficiently via createObjectURL.
  */
+async function compressImage(file: File): Promise<string> {
+  const isImage = file.type.startsWith("image/") || /\.(jpe?g|png|webp|bmp|gif|heic|heif)$/i.test(file.name);
+  if (!isImage && file.type) {
+    console.warn(`Attempting to compress non-standard MIME type: "${file.type}" (${file.name})`);
+  }
 
-async function compressImage(file:File):Promise<string>{
-  const rawData = await new Promise<string>((resolve ,reject)=>{
-    const reader = new FileReader();
-    reader.onload = ()=> resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  // Use URL.createObjectURL for memory efficiency on mobile devices (avoids large base64 allocations in JS heap)
+  const objectUrl = URL.createObjectURL(file);
 
-  const img = await new Promise<HTMLImageElement>((resolve,reject)=>{
-    const img = new Image();
-    img.onload = ()=> resolve(img);
-    img.onerror = reject;
-    img.src = rawData;
-  });
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const imageEl = new Image();
+      imageEl.onload = () => resolve(imageEl);
+      imageEl.onerror = (e) => {
+        reject(
+          new Error(
+            `Failed to decode image "${file.name}" (${file.type || "unknown type"}). Please verify file is a valid image.`
+          )
+        );
+      };
+      imageEl.src = objectUrl;
+    });
 
- const MAX_DIMENSION=1600;
- let {width , height} = img;
+    const naturalWidth = img.naturalWidth || img.width;
+    const naturalHeight = img.naturalHeight || img.height;
 
- /**
-  * we need to @calculate the @dimension and scale down @proportionally
-  * so that the longest side is @exactly 1600px, no larger.
-  */
+    if (!naturalWidth || !naturalHeight) {
+      throw new Error(`Invalid image dimensions (${naturalWidth}x${naturalHeight}) for file: ${file.name}`);
+    }
 
- if(width > MAX_DIMENSION || height > MAX_DIMENSION){
-  const scale = MAX_DIMENSION / Math.max(width , height);
-  width = Math.round(width * scale);
-  height = Math.round(height * scale);
- }
+    const MAX_DIMENSION = 1600;
+    let width = naturalWidth;
+    let height = naturalHeight;
 
+    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+      const scale = MAX_DIMENSION / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
 
- const canvas = document.createElement("canvas");
- canvas.width = width;
- canvas.height = height;
- const ctx = canvas.getContext("2d")!;
- ctx.imageSmoothingQuality="high";
- ctx.drawImage(img,0,0,width,height);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
 
- // JPEG at 80%
- const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.5);
- return jpegDataUrl;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Unable to obtain 2D canvas context for image compression");
+    }
+
+    // High quality downsampling
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, width, height);
+
+    // Export as JPEG at 80% quality (0.8)
+    const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+    const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    // Base64 payload size in MB approx = (char count * 3/4) / (1024 * 1024)
+    const compressedPayloadMB = ((jpegDataUrl.length * 0.75) / (1024 * 1024)).toFixed(2);
+
+    console.log(
+      `[Image Compression] "${file.name}": Original ${originalSizeMB} MB (${naturalWidth}x${naturalHeight}) -> Compressed ${compressedPayloadMB} MB (${width}x${height})`
+    );
+
+    return jpegDataUrl;
+  } catch (error) {
+    console.error(`[Image Compression Error] Failed to compress image "${file.name}":`, error);
+    throw error;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
-
-
 
 function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return "0 B";
@@ -73,7 +102,12 @@ function formatBytes(bytes: number, decimals = 1): string {
 }
 
 async function fileToPageImages(file: File): Promise<PageImage[]> {
-  if (file.type === "application/pdf") {
+  const isPdf =
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf");
+
+  if (isPdf) {
+    console.log(`[PDF Processing] Rendering pages for PDF "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB)...`);
     const pdfjsLib = await import("pdfjs-dist");
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -83,11 +117,21 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2 });
+      
+      // Calculate appropriate scale so max dimension does not exceed 1600px
+      const unscaledViewport = page.getViewport({ scale: 1 });
+      const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
+      const targetScale = maxDim > 0 ? Math.min(2, 1600 / maxDim) : 2;
+      const viewport = page.getViewport({ scale: Math.max(targetScale, 1) });
+
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      const context = canvas.getContext("2d")!;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error(`Failed to get canvas 2D context for PDF page ${i}`);
+      }
 
       await page.render({
         canvasContext: context,
@@ -95,14 +139,16 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
         canvas,
       }).promise;
 
-      images.push({ pageIndex: i, imgUrl: canvas.toDataURL("image/png") });
+      // Use JPEG with 0.8 quality instead of uncompressed PNG to prevent payload size bloat
+      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      images.push({ pageIndex: i, imgUrl: jpegDataUrl });
     }
 
+    console.log(`[PDF Processing] Rendered ${images.length} pages as compressed JPEGs.`);
     return images;
   } else {
-    console.log("Original file size (MB):", file.size / (1024 * 1024));
+    // Process image file through canvas-based downsampling & JPEG compression
     const dataUrl = await compressImage(file);
-    console.log("Compressed size (MB):", dataUrl.length / (1024 * 1024));
     return [{ pageIndex: 1, imgUrl: dataUrl }];
   }
 }
@@ -199,9 +245,15 @@ export default function UploadPanel({
         // Filled State Card
         <div className="relative w-full rounded-2xl border-2 border-dashed border-gray-200/90 bg-white p-5 md:p-6 shadow-sm flex items-center justify-center min-h-[140px] transition-all hover:border-gray-300">
           <div className="flex items-center gap-3.5 bg-gray-50/80 border border-gray-100/80 rounded-xl px-4 py-3.5 w-full max-w-[340px] shadow-sm relative pr-10">
-            {/* PDF Red Badge Icon */}
-            <div className="w-10 h-10 rounded-lg bg-rose-500 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
-              <span className="text-[10px] font-black tracking-wider uppercase">PDF</span>
+            {/* File Format Badge Icon */}
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0 shadow-sm ${
+                fileDetails.name.toLowerCase().endsWith(".pdf") ? "bg-rose-500" : "bg-emerald-600"
+              }`}
+            >
+              <span className="text-[10px] font-black tracking-wider uppercase">
+                {fileDetails.name.toLowerCase().endsWith(".pdf") ? "PDF" : "IMG"}
+              </span>
             </div>
 
             {/* File Info */}

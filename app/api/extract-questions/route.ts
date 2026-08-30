@@ -32,11 +32,13 @@ import { QuestionExtractionResult } from "@/app/lib/types";
 
             const imageParts = images.map((img) => {
                   const url = img.dataUrl || (img as unknown as { imgUrl?: string }).imgUrl || "";
+                  const match = url.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+                  const mimeType = match ? match[1] : "image/jpeg";
                   return {
                         inlineData: {
                               //split on the comma : everything after it is the actual base64 data
                               data: url.includes(",") ? url.split(",")[1] : url,
-                              mimeType: "image/png",
+                              mimeType,
                         },
                   };
             });

@@ -41,13 +41,15 @@ export async function POST(req: NextRequest) {
             //dynamically injecting the question in the prompt structure
             const prompt = buildAnswerMappingPrompt(questions);
 
-            //same image-part conversion as the question extraction route
+            // Convert images to inlineData parts with dynamically detected MIME type
             const imageParts = images.map((img) => {
                   const url = img.dataUrl || img.imgUrl || "";
+                  const match = url.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,/);
+                  const mimeType = match ? match[1] : "image/jpeg";
                   return {
                         inlineData: {
                               data: url.includes(",") ? url.split(",")[1] : url,
-                              mimeType: "image/png",
+                              mimeType,
                         }
                   };
             });
