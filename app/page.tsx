@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import UploadPanel, { PageImage, FileDetails } from "./components/UploadPanel";
-import {AnswerSheetViewer}  from "./components/AnswerSheetViewer";
+import AnswerSheetViewer from "./components/AnswerSheetViewer";
 import Sidebar from "./components/Sidebar";
 import { Question, AnswerSegment } from "./lib/types";
 
