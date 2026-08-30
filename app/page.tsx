@@ -57,19 +57,20 @@ export default function Home() {
 // Step 2: Extract answers, map bounding boxes, and grade correctness
 
 // TEMP DEBUG: show the actual payload size in the visible error banner,
-// since DevTools access has been unreliable. Remove after diagnosing.
-const answerPayload = JSON.stringify({ images: answerPaperImg, questions: rawQuestions });
-const payloadSizeMB = (answerPayload.length / (1024 * 1024)).toFixed(2);
-setErrorMessage(`DEBUG: Answer payload size = ${payloadSizeMB} MB (images: ${answerPaperImg.length}, first image length: ${answerPaperImg[0]?.imgUrl?.length || 0} chars)`);
+ // Step 2: Extract answers, map bounding boxes, and grade correctness
+      const answerPayload = JSON.stringify({ images: answerPaperImg, questions: rawQuestions });
+      const payloadSizeMB = (answerPayload.length / (1024 * 1024)).toFixed(2);
+      
+      setErrorMessage(`DEBUG: Payload = ${payloadSizeMB} MB | images: ${answerPaperImg.length} | first image chars: ${answerPaperImg[0]?.imgUrl?.length || 0}`);
+      setIsExtracting(false);
+      return; 
+      // STOP HERE — don't actually send the request, just show the debug info permanently
 
-// Pause here so you can read it before the real request potentially fails
-await new Promise((r) => setTimeout(r, 3000));
-
-const aRes = await fetch("/api/extract-answers", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: answerPayload,
-});
+      const aRes = await fetch("/api/extract-answers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: answerPayload,
+      });
       // Step 2: Extract answers, map bounding boxes, and grade correctness
       // const aRes = await fetch("/api/extract-answers", {
       //   method: "POST",
