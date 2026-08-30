@@ -13,6 +13,56 @@ export type FileDetails = {
   pages: number;
 };
 
+/**
+ * Takes a @raw_image File and returns a @compressed_base64 dataUrl.
+ * Caps the longest side at 1600 px and exports as @JPEG at 80% quality —
+ * @raw_phone_camera photo (which can be 4000px+ and several MB)
+ */
+
+async function compressImage(file:File):Promise<string>{
+  const rawData = await new Promise<string>((resolve ,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const img = await new Promise<HTMLImageElement>((resolve,reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve(img);
+    img.onerror = reject;
+    img.src = rawData;
+  });
+
+ const MAX_DIMENSION=1600;
+ let {width , height} = img;
+
+ /**
+  * we need to @calculate the @dimension and scale down @proportionally
+  * so that the longest side is @exactly 1600px, no larger.
+  */
+
+ if(width > MAX_DIMENSION || height > MAX_DIMENSION){
+  const scale = MAX_DIMENSION / Math.max(width , height);
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
+ }
+
+
+ const canvas = document.createElement("canvas");
+ canvas.width = width;
+ canvas.height = height;
+ const ctx = canvas.getContext("2d")!;
+ ctx.imageSmoothingQuality="high";
+ ctx.drawImage(img,0,0,width,height);
+
+ // JPEG at 80%
+ const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+ return jpegDataUrl;
+}
+
+
+
 function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -50,13 +100,9 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
 
     return images;
   } else {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
+    // Plain image upload (jpg/png) — compress before returning, since
+    // phone camera photos can be huge and blow past Vercel's payload limit.
+    const dataUrl = await compressImage(file);
     return [{ pageIndex: 1, imgUrl: dataUrl }];
   }
 }
