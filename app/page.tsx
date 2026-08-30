@@ -58,28 +58,16 @@ export default function Home() {
 
 // TEMP DEBUG: show the actual payload size in the visible error banner,
  // Step 2: Extract answers, map bounding boxes, and grade correctness
+          // Step 2: Extract answers, map bounding boxes, and grade correctness
       const answerPayload = JSON.stringify({ images: answerPaperImg, questions: rawQuestions });
-      const payloadSizeMB = (answerPayload.length / (1024 * 1024)).toFixed(2);
-      
-      setErrorMessage(`DEBUG: Payload = ${payloadSizeMB} MB | images: ${answerPaperImg.length} | first image chars: ${answerPaperImg[0]?.imgUrl?.length || 0}`);
-      setIsExtracting(false);
-      return; 
-      // STOP HERE — don't actually send the request, just show the debug info permanently
 
       const aRes = await fetch("/api/extract-answers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: answerPayload,
       });
-      // Step 2: Extract answers, map bounding boxes, and grade correctness
-      // const aRes = await fetch("/api/extract-answers", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({
-      //     images: answerPaperImg,
-      //     questions: rawQuestions,
-      //   }),
-      // });
+
+      
 
       if (!aRes.ok) {
         throw new Error("Failed to map and grade answers from answer sheets.");
@@ -366,7 +354,7 @@ export default function Home() {
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
                   }`}
                 >
-                  <span>TESTING123</span>
+                  <span>Start Mapping</span>
                   <span>→</span>
                 </button>
 
