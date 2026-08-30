@@ -1,11 +1,14 @@
 import type { NextConfig } from "next";
 
-
-
-const nextConfig = {
+const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
 };
+
 export default nextConfig;
-//https://github.com/jai345coder/vedaai-assessment.git

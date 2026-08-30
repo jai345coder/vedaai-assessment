@@ -118,11 +118,11 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       
-      // Calculate appropriate scale so max dimension does not exceed 1600px
+      // Calculate appropriate scale so max dimension does not exceed 1000px
       const unscaledViewport = page.getViewport({ scale: 1 });
       const maxDim = Math.max(unscaledViewport.width, unscaledViewport.height);
-      const targetScale = maxDim > 0 ? Math.min(2, 1600 / maxDim) : 2;
-      const viewport = page.getViewport({ scale: Math.max(targetScale, 1) });
+      const targetScale = maxDim > 0 ? Math.min(1.5, 1000 / maxDim) : 1.2;
+      const viewport = page.getViewport({ scale: Math.max(targetScale, 0.8) });
 
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width;
@@ -139,8 +139,8 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
         canvas,
       }).promise;
 
-      // Use JPEG with 0.8 quality instead of uncompressed PNG to prevent payload size bloat
-      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      // Use JPEG with 0.5 quality to keep multi-page payloads well within Vercel's limits (~80-120KB per page)
+      const jpegDataUrl = canvas.toDataURL("image/jpeg", 0.5);
       images.push({ pageIndex: i, imgUrl: jpegDataUrl });
     }
 
@@ -148,9 +148,9 @@ async function fileToPageImages(file: File): Promise<PageImage[]> {
     return images;
   } else {
     const dataUrl = await compressImage(file);
-  const sizeMB = (dataUrl.length * 0.75) / (1024 * 1024); // base64 is ~33% larger than binary, so *0.75 estimates real size
-  document.title = `Compressed: ${sizeMB.toFixed(2)} MB`; // shows in browser tab title, easy to see on phone
-  return [{ pageIndex: 1, imgUrl: dataUrl }];
+    const sizeMB = (dataUrl.length * 0.75) / (1024 * 1024);
+    console.log(`[Image Processing] Final image payload: ${sizeMB.toFixed(2)} MB`);
+    return [{ pageIndex: 1, imgUrl: dataUrl }];
   }
 }
 
